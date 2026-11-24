@@ -37,6 +37,7 @@ Render's free plan puts a web service to sleep after 15 minutes with no requests
 ## Good to know
 
 - 5 rounds are played, and the highest total wins.
+- The deck depends on the number of players. 2 to 4 players: 52 cards plus 2 jokers. 5 players: two decks (104 cards) plus 2 jokers. 6 players: 104 cards plus 3 jokers. 7 to 10 players: 104 cards plus 4 jokers.
 - If a player does nothing for 2 minutes, the game makes a simple move for them so nobody is stuck.
 - Unanswered Double or Triple calls pass automatically after 25 seconds.
 - A player who closes the page can come back on the same phone and rejoin the same game.

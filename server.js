@@ -10,10 +10,12 @@ const rooms = new Map();
 // ---------- cards ----------
 function vOf(r) { return r === 'A' ? 11 : (r === 'J' || r === 'Q' || r === 'K') ? 10 : +r; }
 function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = crypto.randomInt(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; }
-function mk() {
-  const d = [];
-  SUITS.forEach(s => RANKS.forEach(r => d.push({ s, r, v: vOf(r) })));
-  for (let i = 0; i < 4; i++) d.push({ s: '★', r: 'Jk', v: 11, j: true });
+// 2-4 players: one 52-card deck + 2 jokers. 5 players: two decks (104) + 2 jokers. 6 players: two decks + 3 jokers. 7-10 players: two decks + 4 jokers.
+function deckSpec(n) { return { copies: n > 4 ? 2 : 1, jokers: n <= 5 ? 2 : n === 6 ? 3 : 4 }; }
+function mk(n) {
+  const sp = deckSpec(n), d = [];
+  for (let c = 0; c < sp.copies; c++) SUITS.forEach(s => RANKS.forEach(r => d.push({ s, r, v: vOf(r) })));
+  for (let i = 0; i < sp.jokers; i++) d.push({ s: '★', r: 'Jk', v: 11, j: true });
   return shuffle(d);
 }
 // best single-suit total (jokers count in any suit), capped at 54
@@ -54,7 +56,7 @@ function newRound(room) {
   let dk, hs, ok, tries = 0;
   // middle-difficulty deal: no hand starts too strong or too weak
   do {
-    dk = mk(); hs = room.players.map(() => []);
+    dk = mk(n); hs = room.players.map(() => []);
     for (let i = 0; i < 5; i++) for (let p = 0; p < n; p++) hs[p].push(dk.pop());
     hs[st].push(dk.pop());
     ok = hs.every(h => { const t = pickBest(h).t; return t >= 12 && t <= 30 && h.filter(c => c.j).length <= 1; });
@@ -240,4 +242,4 @@ if (require.main === module) {
   }, 20000);
   server.listen(PORT, () => console.log('Declare server listening on ' + PORT));
 }
-module.exports = { rooms, newRoom, addPlayer, act, best, pickBest, view, server };
+module.exports = { deckSpec, rooms, newRoom, addPlayer, act, best, pickBest, view, server };
