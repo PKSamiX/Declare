@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -16,11 +16,13 @@
 :root[data-theme="dark"]{ --bg:#0b1519; --table:#132a31; --table2:#0b191e; }
 html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
 *{box-sizing:border-box}
-body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:"Trebuchet MS","Segoe UI",Roboto,sans-serif}
+body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:"Trebuchet MS","Segoe UI",Tahoma,Roboto,sans-serif}
 #app{height:100%;max-width:560px;margin:0 auto;display:flex;flex-direction:column;background:radial-gradient(ellipse at 50% 40%,var(--table),var(--table2));padding:10px 0;position:relative;overflow:hidden}
-header{display:flex;justify-content:space-between;align-items:baseline;padding:0 16px}
+header{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:0 16px}
 h1{font-family:Georgia,"Times New Roman",serif;font-size:22px;margin:0}
 .rule{font-size:12px;color:var(--muted)}
+.hb{display:flex;align-items:center;gap:6px}
+.hb button{padding:2px 10px;min-height:30px;font-size:12px}
 #scores{display:flex;flex-wrap:wrap;gap:6px;padding:8px 16px 0}
 .sc{flex:1 1 64px;background:rgba(255,255,255,.08);border-radius:10px;padding:5px 8px;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sc b{display:block;font-size:20px;color:var(--text)}
@@ -38,6 +40,7 @@ button.card{cursor:pointer}
 button.card:disabled{cursor:default;opacity:1}
 .card.sm{width:52px;height:74px;font-size:17px;padding:5px 6px;gap:2px;margin-left:-6px}
 .card.sm i{font-size:24px}
+.fan,.piles,.tbl,#hand{direction:ltr}
 .fan{display:flex}
 #mid{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;padding:0 16px}
 .piles{display:flex;gap:18px;align-items:center;justify-content:center;width:100%;margin-top:22px}
@@ -60,12 +63,12 @@ button.act:disabled{opacity:.35;cursor:default}
 .overlay{position:absolute;inset:0;background:rgba(6,14,17,.93);display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:14px;text-align:center;padding:20px;overflow:auto}
 .overlay>:first-child{margin-top:auto}.overlay>:last-child{margin-bottom:auto}
 .overlay h2{font-family:Georgia,serif;font-size:26px;margin:0}
-.row{width:100%;max-width:420px;text-align:left;background:rgba(255,255,255,.07);border-radius:12px;padding:10px 12px}
+.row{width:100%;max-width:420px;text-align:start;background:rgba(255,255,255,.07);border-radius:12px;padding:10px 12px}
 .row.win{outline:2px solid var(--accent)}
 .row .fan{padding:6px 0 2px 6px;flex-wrap:wrap;row-gap:4px}
 .row small{color:var(--muted)}
 input{font:inherit;padding:12px 14px;border-radius:12px;border:0;width:100%;max-width:320px;text-align:center;background:var(--face);color:var(--ink)}
-.code{font-family:Georgia,serif;font-size:52px;letter-spacing:8px;font-weight:700;color:var(--accent);padding-left:8px}
+.code{font-family:Georgia,serif;font-size:52px;letter-spacing:8px;font-weight:700;color:var(--accent);padding-inline-start:8px;direction:ltr}
 .err{color:#ff8a93;min-height:20px;font-size:14px}
 :focus-visible{outline:3px solid #fff;outline-offset:2px}
 @media (prefers-reduced-motion:reduce){.card{transition:none}.ptr{animation:none}}
@@ -73,8 +76,8 @@ input{font:inherit;padding:12px 14px;border-radius:12px;border:0;width:100%;max-
 </head>
 <body>
 <div id="app">
-  <header><h1>Declare</h1><div><span class="rule" id="rnd"></span> <button class="act alt" id="snb" onclick="MUTE=!MUTE;this.textContent=MUTE?'Sound off':'Sound on'" style="padding:2px 10px;min-height:30px;font-size:12px">Sound on</button></div></header>
-  <div class="rule" style="padding:2px 16px 0">Collect one suit. Jokers count in any suit. You need 40 to score. Maximum 54.</div>
+  <header><h1>Declare</h1><div class="hb"><span class="rule" id="rnd"></span><button class="act alt" id="snb" onclick="toggleSound()"></button><button class="act alt" id="lgb" onclick="flipLang()"></button></div></header>
+  <div class="rule" id="rule1" style="padding:2px 16px 0"></div>
   <div id="scores"></div>
   <div id="cpus"></div>
   <div id="mid">
@@ -91,32 +94,94 @@ input{font:inherit;padding:12px 14px;border-radius:12px;border:0;width:100%;max-
 </div>
 <script>
 var SUITS=['♠','♥','♦','♣'];
-var S=null,PREV=null,CODE='',PID='',NAME='',PRE='',ES=null,sel=[],mode='',err='',MUTE=false,AC=null,SAVED=null,CT=0,HID=0;
+var S=null,PREV=null,CODE='',PID='',NAME='',PRE='',ES=null,sel=[],mode='',err='',MUTE=false,AC=null,SAVED=null,CT=0,HID=0,LANG='en';
+var TX={
+en:{
+ rule1:'Collect one suit. Jokers count in any suit. You need 40 to score. Maximum 54.',
+ sndOn:'Sound on',sndOff:'Sound off',lang:'العربية',joker:'a Joker',
+ round:'Round {a} of {b}',you:'(you)',chip:'{n} · {c}',off:' · offline',
+ deckN:'{n} in deck',tableN:'On the table: {n}',tableEmpty:'Nothing on the table',
+ best:'Your best suit: {s} {t}',bestOk:' (enough to score)',bestNeed:' (need 40)',
+ draw:'Draw from deck',wipes:' (wipes table)',takeCard:'Take the card',takeCards:'Take the {c}',takeAll:'Take all {k}',takeOne:'Take one',declare:'Declare',throwBtn:'Throw {a} of {b}',
+ hintMine:'Your turn: draw, take from the table, or declare.',hintThrow1:'Throw one card.',hintThrowN:'Throw {c}: tap them, then press Throw.',hintWait:'Waiting for the other players…',hintPick:'Tap the table card you want.',
+ m_start:'Round {r}: {n} starts and throws a card.',m_drew:'{n} drew a card.',m_drewW:'{n} drew a card and wiped the table.',m_tookAll:'{n} took {c} from the table.',m_tookOne:'{n} took one card from the table.',m_threw:'{n} threw {c}.',m_declared:'{n} declared!',m_dbl:'{n} called Double!',m_trp:'{n} called Triple!',m_toPlay:'{n} to play.',m_auto:'(auto)',
+ h_sub:'Play online with friends and family. Only people who join take part, and no computer players are added.',h_rejoin:'Rejoin game {c}',h_fresh:'or start fresh',h_name:'Your name',h_create:'Create a game',h_or:'or join a friend’s game with its code',h_code:'CODE',h_join:'Join game',
+ l_title:'Game code',l_give:'Give this code to the people you want to play with, or send them the link.',l_share:'Share invite link',l_host:'host · ',l_you:'you · ',l_on:'online',l_off:'offline',l_count:'{n} of 10 players joined. 2 to 10 can play.',l_deck:'Deck for {n} players: {d} cards plus {j} jokers.',l_start:'Start game',l_wait:'Waiting for the host to start…',
+ c_title:'Connecting…',c_sub:'If the server was asleep this can take up to a minute.',c_back:'Back',
+ p_decl:'{n} declared',p_dbl:'{n} called Double',p_best:'Your best suit: {s} {t}',p_dblHelp:'Call Double if you think you have more than the declarer. The winner scores double.',p_trpHelp:'Call Triple if you think you have more than both. The winner scores triple.',p_auto:' Unanswered calls pass after 25 seconds.',p_double:'Double',p_triple:'Triple',p_pass:'Pass',
+ r_show:'Showdown',r_decl:'Declared',r_dbl:'Doubled',r_trp:'Tripled',r_sat:'Sat out',r_win:'{n} wins {t} × {m} = {p} points',r_none:'No points: the best total is under 40',r_de:'The deck ran out, so the round ended.',r_next:'Next round',r_final:'See final result',
+ f_tie:'Tie: {n}',f_and:' and ',f_win:'{n} wins the game!',f_pts:'{n}: {s} points',f_again:'Play again',f_wait:'The host can start a new game.',
+ e_host_only:'Only the host can do that.',e_need2:'You need at least 2 players.',e_no_draw:'You cannot draw now.',e_no_take:'You cannot take now.',e_no_take_one:'You cannot take one card now.',e_bad_count:'Throw the right number of cards.',e_bad_cards:'Invalid cards.',e_need40:'You need 40 points to declare.',e_no_call:'Nothing to answer.',e_not_now:'Not now.',e_unknown:'Unknown action.',e_full_server:'The server is full. Try again later.',e_no_game:'Game not found. Check the code.',e_started:'That game has already started. To get back in, join with the exact name you used before.',e_full:'That game is full (10 players).',e_not_in:'You are not in this game.',e_net:'Cannot reach the server. It may be waking up: wait a minute and try again.',e_gone:'That game is no longer available.',e_conn:'Could not connect. Try again, or join with the code and the exact same name.',e_copied:'Link copied.',
+ share:'Join my Declare game. Code: {c}'
+},
+ar:{
+ rule1:'اجمع أوراقاً من شكل واحد. الجوكر يُحتسب مع أي شكل. تحتاج إلى 40 نقطة لتسجّل. الحد الأقصى 54.',
+ sndOn:'الصوت: يعمل',sndOff:'الصوت: متوقف',lang:'English',joker:'جوكر',
+ round:'الجولة {a} من {b}',you:'(أنت)',chip:'{n} · {c}',off:' · غير متصل',
+ deckN:'في الكومة: {n}',tableN:'على الطاولة: {n}',tableEmpty:'لا شيء على الطاولة',
+ best:'أفضل شكل لديك: {s} {t}',bestOk:' (كافٍ للتسجيل)',bestNeed:' (تحتاج 40)',
+ draw:'اسحب من الكومة',wipes:' (تمسح الطاولة)',takeCard:'خذ الورقة',takeCards:'خذ {c}',takeAll:'خذ الكل ({k})',takeOne:'خذ ورقة واحدة',declare:'أعلن',throwBtn:'ارمِ {a} من {b}',
+ hintMine:'دورك: اسحب أو خذ من الطاولة أو أعلن.',hintThrow1:'ارمِ ورقة.',hintThrowN:'ارمِ {c}: اضغط عليها ثم اضغط «ارمِ».',hintWait:'بانتظار اللاعبين الآخرين…',hintPick:'اضغط على الورقة التي تريدها من الطاولة.',
+ m_start:'الجولة {r}: يبدأ {n} ويرمي ورقة.',m_drew:'سحب {n} ورقة.',m_drewW:'سحب {n} ورقة ومسح الطاولة.',m_tookAll:'أخذ {n} {c} من الطاولة.',m_tookOne:'أخذ {n} ورقة من الطاولة.',m_threw:'رمى {n} {c}.',m_declared:'أعلن {n}!',m_dbl:'قال {n}: دبل!',m_trp:'قال {n}: تربل!',m_toPlay:'الدور على {n}.',m_auto:'(تلقائي)',
+ h_sub:'العب أونلاين مع الأهل والأصدقاء. يشارك فقط من ينضم، ولا تُضاف أي لاعبين آليين.',h_rejoin:'العودة إلى اللعبة {c}',h_fresh:'أو ابدأ من جديد',h_name:'اسمك',h_create:'إنشاء لعبة',h_or:'أو انضم إلى لعبة صديق بالرمز',h_code:'الرمز',h_join:'انضمام',
+ l_title:'رمز اللعبة',l_give:'أعطِ هذا الرمز لمن تريد اللعب معهم، أو أرسل لهم الرابط.',l_share:'مشاركة رابط الدعوة',l_host:'المضيف · ',l_you:'أنت · ',l_on:'متصل',l_off:'غير متصل',l_count:'انضم {n} من 10 لاعبين. يمكن أن يلعب من 2 إلى 10.',l_deck:'الأوراق لـ {n} لاعبين: {d} ورقة بالإضافة إلى {j} جوكر.',l_start:'ابدأ اللعبة',l_wait:'بانتظار المضيف ليبدأ اللعبة…',
+ c_title:'جارٍ الاتصال…',c_sub:'إذا كان الخادم نائماً فقد يستغرق ذلك حتى دقيقة.',c_back:'رجوع',
+ p_decl:'أعلن {n}',p_dbl:'قال {n}: دبل',p_best:'أفضل شكل لديك: {s} {t}',p_dblHelp:'قل دبل إذا كنت تعتقد أن لديك أكثر من المعلن. الفائز يحصل على الضعف.',p_trpHelp:'قل تربل إذا كنت تعتقد أن لديك أكثر من الاثنين. الفائز يحصل على ثلاثة أضعاف.',p_auto:' الردود غير المُجابة تُعتبر تمريراً بعد 25 ثانية.',p_double:'دبل',p_triple:'تربل',p_pass:'تمرير',
+ r_show:'كشف الأوراق',r_decl:'أعلن',r_dbl:'قال دبل',r_trp:'قال تربل',r_sat:'لم يشارك',r_win:'فاز {n} بـ {t} × {m} = {p} نقطة',r_none:'لا نقاط: أفضل مجموع أقل من 40',r_de:'نفدت الأوراق فانتهت الجولة.',r_next:'الجولة التالية',r_final:'عرض النتيجة النهائية',
+ f_tie:'تعادل: {n}',f_and:' و ',f_win:'فاز {n} باللعبة!',f_pts:'{n}: {s} نقطة',f_again:'العب مجدداً',f_wait:'يمكن للمضيف بدء لعبة جديدة.',
+ e_host_only:'المضيف فقط يمكنه ذلك.',e_need2:'تحتاج إلى لاعبين اثنين على الأقل.',e_no_draw:'لا يمكنك السحب الآن.',e_no_take:'لا يمكنك الأخذ الآن.',e_no_take_one:'لا يمكنك أخذ ورقة واحدة الآن.',e_bad_count:'ارمِ العدد الصحيح من الأوراق.',e_bad_cards:'أوراق غير صالحة.',e_need40:'تحتاج إلى 40 نقطة لتعلن.',e_no_call:'لا شيء للرد عليه.',e_not_now:'ليس الآن.',e_unknown:'إجراء غير معروف.',e_full_server:'الخادم ممتلئ. حاول لاحقاً.',e_no_game:'اللعبة غير موجودة. تحقق من الرمز.',e_started:'هذه اللعبة بدأت بالفعل. للعودة، انضم بالاسم نفسه تماماً الذي استخدمته من قبل.',e_full:'هذه اللعبة ممتلئة (10 لاعبين).',e_not_in:'أنت لست في هذه اللعبة.',e_net:'تعذّر الوصول إلى الخادم. قد يكون نائماً: انتظر دقيقة وحاول مرة أخرى.',e_gone:'هذه اللعبة لم تعد متاحة.',e_conn:'تعذّر الاتصال. حاول مرة أخرى، أو انضم بالرمز وبنفس الاسم تماماً.',e_copied:'تم نسخ الرابط.',
+ share:'انضم إلى لعبتي Declare. الرمز: {c}'
+}};
+function t(k,p){
+  var s=TX[LANG][k];if(s===undefined)s=TX.en[k];if(s===undefined)return k;
+  return p?s.replace(/\{(\w+)\}/g,function(m,x){return p[x]===undefined?'':p[x]}):s;
+}
+function cp(k){
+  if(LANG==='ar')return k===1?'ورقة':k===2?'ورقتين':(k>=3&&k<=10)?k+' أوراق':k+' ورقة';
+  return k===1?'1 card':k+' cards';
+}
 function $(id){return document.getElementById(id)}
 function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function bdi(n){return '<bdi>'+esc(n)+'</bdi>'}
+function iso(n){return '\u2068'+n+'\u2069'}
 function red(s){return s==='♥'||s==='♦'}
-function nm(c){return c.j?'a Joker':c.r+c.s}
+function nm(c){return c.j?t('joker'):c.r+c.s}
+function errText(k){return t('e_'+k)}
 function best(h){
   var jk=h.filter(function(c){return c.j}).length,b={s:'♠',t:-1};
-  SUITS.forEach(function(s){var t=h.reduce(function(a,c){return a+(c.s===s?c.v:0)},0)+jk*11;if(t>b.t)b={s:s,t:t}});
+  SUITS.forEach(function(s){var x=h.reduce(function(a,c){return a+(c.s===s?c.v:0)},0)+jk*11;if(x>b.t)b={s:s,t:x}});
   b.t=Math.min(54,b.t);return b;
 }
+function fmtMsg(arr){
+  return (arr||[]).map(function(m){return t('m_'+m.k,{n:iso(m.n||''),r:m.r,c:m.c?cp(m.c):''})}).join(' ');
+}
+function setLang(l){
+  readInputs();LANG=l;try{localStorage.setItem('declare_lang',l)}catch(e){}
+  applyLang();render();
+}
+function flipLang(){setLang(LANG==='ar'?'en':'ar')}
+function langBtn(){return '<button class="act alt" style="padding:4px 14px;min-height:34px;font-size:13px" onclick="flipLang()">'+t('lang')+'</button>'}
+function applyLang(){
+  document.documentElement.lang=LANG;document.documentElement.dir=LANG==='ar'?'rtl':'ltr';
+  $('rule1').textContent=t('rule1');$('lgb').textContent=t('lang');$('snb').textContent=t(MUTE?'sndOff':'sndOn');
+}
+function toggleSound(){MUTE=!MUTE;$('snb').textContent=t(MUTE?'sndOff':'sndOn')}
 function snd(k){
   try{
     AC=AC||new (window.AudioContext||window.webkitAudioContext)();
     if(AC.state==='suspended')AC.resume();
     if(MUTE||k==='init')return;
-    var t=AC.currentTime,dr=k==='draw',len=dr?.16:.1,n=Math.floor(AC.sampleRate*len),b=AC.createBuffer(1,n,AC.sampleRate),d=b.getChannelData(0);
+    var tm=AC.currentTime,dr=k==='draw',len=dr?.16:.1,n=Math.floor(AC.sampleRate*len),b=AC.createBuffer(1,n,AC.sampleRate),d=b.getChannelData(0);
     for(var i=0;i<n;i++)d[i]=(Math.random()*2-1)*(dr?Math.sin(Math.PI*i/n):Math.pow(1-i/n,4));
     var s=AC.createBufferSource(),f=AC.createBiquadFilter(),g=AC.createGain();
     s.buffer=b;f.type='bandpass';f.Q.value=.9;g.gain.value=dr?.35:.7;
-    f.frequency.setValueAtTime(dr?1500:1800,t);if(dr)f.frequency.linearRampToValueAtTime(5000,t+len);
-    s.connect(f);f.connect(g);g.connect(AC.destination);s.start(t);
-    if(!dr){var o=AC.createOscillator(),og=AC.createGain();o.frequency.setValueAtTime(200,t);o.frequency.exponentialRampToValueAtTime(70,t+.08);og.gain.setValueAtTime(.35,t);og.gain.exponentialRampToValueAtTime(.001,t+.1);o.connect(og);og.connect(AC.destination);o.start(t);o.stop(t+.12)}
+    f.frequency.setValueAtTime(dr?1500:1800,tm);if(dr)f.frequency.linearRampToValueAtTime(5000,tm+len);
+    s.connect(f);f.connect(g);g.connect(AC.destination);s.start(tm);
+    if(!dr){var o=AC.createOscillator(),og=AC.createGain();o.frequency.setValueAtTime(200,tm);o.frequency.exponentialRampToValueAtTime(70,tm+.08);og.gain.setValueAtTime(.35,tm);og.gain.exponentialRampToValueAtTime(.001,tm+.1);o.connect(og);og.connect(AC.destination);o.start(tm);o.stop(tm+.12)}
   }catch(e){}
 }
 function face(c,cls,att){
-  return '<button class="card '+(c.j?'jk ':red(c.s)?'red ':'')+(cls||'')+'" '+(att||'disabled tabindex="-1"')+' aria-label="'+nm(c)+'"><span>'+c.r+'</span><i>'+c.s+'</i></button>';
+  return '<button class="card '+(c.j?'jk ':red(c.s)?'red ':'')+(cls||'')+'" '+(att||'disabled tabindex="-1"')+' aria-label="'+esc(nm(c))+'"><span>'+c.r+'</span><i>'+c.s+'</i></button>';
 }
 function save(){SAVED={code:CODE,pid:PID,name:NAME};try{localStorage.setItem('declare',JSON.stringify(SAVED))}catch(e){}}
 function toHome(){clearTimeout(CT);if(ES)ES.close();ES=null;S=null;PREV=null;CODE='';PID='';if(!PRE&&SAVED)PRE=SAVED.code;render()}
@@ -124,14 +189,14 @@ function forget(){try{localStorage.removeItem('declare')}catch(e){}SAVED=null;to
 function rejoin(){if(!SAVED)return;CODE=SAVED.code;PID=SAVED.pid;err='';snd('init');connect();render()}
 function post(path,body){
   return fetch('/api/'+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
-    .then(function(r){return r.json()}).catch(function(){return {error:'Cannot reach the server. It may be waking up: wait a minute and try again.'}});
+    .then(function(r){return r.json()}).catch(function(){return {error:'net'}});
 }
 function connect(){
   if(ES)ES.close();
-  clearTimeout(CT);CT=setTimeout(function(){if(!S){err='Could not connect. Try again, or join with the code and the exact same name.';toHome()}},12000);
+  clearTimeout(CT);CT=setTimeout(function(){if(!S){err='conn';toHome()}},12000);
   ES=new EventSource('/api/events?code='+encodeURIComponent(CODE)+'&pid='+encodeURIComponent(PID));
   ES.onmessage=function(e){onState(JSON.parse(e.data))};
-  ES.onerror=function(){if(ES.readyState===2){err='That game is no longer available.';forget()}};
+  ES.onerror=function(){if(ES.readyState===2){err='gone';forget()}};
 }
 function readInputs(){NAME=$('nm')?$('nm').value:NAME;PRE=$('cd')?$('cd').value:PRE}
 function create(){readInputs();snd('init');post('create',{name:NAME}).then(joined)}
@@ -151,90 +216,92 @@ function onState(s){
 }
 function copyLink(){
   var url=location.origin+'/?code='+S.code;
-  if(navigator.share){navigator.share({title:'Declare',text:'Join my Declare game. Code: '+S.code,url:url}).catch(function(){});return}
-  if(navigator.clipboard){navigator.clipboard.writeText(url).then(function(){err='Link copied.';render();setTimeout(function(){err='';render()},1800)},function(){})}
+  if(navigator.share){navigator.share({title:'Declare',text:t('share',{c:S.code}),url:url}).catch(function(){});return}
+  if(navigator.clipboard){navigator.clipboard.writeText(url).then(function(){err='copied';render();setTimeout(function(){err='';render()},1800)},function(){})}
 }
 function homeHtml(){
-  return '<h2>Declare</h2><div class="rule">Play online with friends and family. Only people who join take part, and no computer players are added.</div>'+(SAVED?'<button class="act" onclick="rejoin()">Rejoin game '+esc(SAVED.code)+'</button><div class="rule">or start fresh</div>':'')+
-    '<input id="nm" placeholder="Your name" maxlength="14" autocomplete="off" value="'+esc(NAME)+'">'+
-    '<button class="act" onclick="create()">Create a game</button>'+
-    '<div class="rule">or join a friend’s game with its code</div>'+
-    '<input id="cd" placeholder="CODE" maxlength="4" autocomplete="off" autocapitalize="characters" style="text-transform:uppercase" value="'+esc(PRE)+'">'+
-    '<button class="act alt" onclick="join()">Join game</button><div class="err">'+esc(err)+'</div>';
+  return langBtn()+'<h2>Declare</h2><div class="rule">'+t('h_sub')+'</div>'+
+    (SAVED?'<button class="act" onclick="rejoin()">'+t('h_rejoin',{c:esc(SAVED.code)})+'</button><div class="rule">'+t('h_fresh')+'</div>':'')+
+    '<input id="nm" placeholder="'+t('h_name')+'" maxlength="14" autocomplete="off" value="'+esc(NAME)+'">'+
+    '<button class="act" onclick="create()">'+t('h_create')+'</button>'+
+    '<div class="rule">'+t('h_or')+'</div>'+
+    '<input id="cd" placeholder="'+t('h_code')+'" maxlength="4" autocomplete="off" autocapitalize="characters" style="text-transform:uppercase" value="'+esc(PRE)+'">'+
+    '<button class="act alt" onclick="join()">'+t('h_join')+'</button><div class="err">'+(err?errText(err):'')+'</div>';
 }
 function lobbyHtml(){
   var host=S.you===0,n=S.players.length;
-  return '<h2>Game code</h2><div class="code">'+esc(S.code)+'</div>'+
-    '<div class="rule">Give this code to the people you want to play with, or send them the link.</div>'+
-    '<button class="act alt" onclick="copyLink()">Share invite link</button>'+
-    S.players.map(function(x,i){return '<div class="row"><b>'+esc(x.name)+'</b> <small>'+(i===0?'host · ':'')+(i===S.you?'you · ':'')+(x.on?'online':'offline')+'</small></div>'}).join('')+
-    '<div class="rule">'+n+' of 10 players joined. 2 to 10 can play.</div>'+'<div class="rule">Deck for '+n+' players: '+(n>4?104:52)+' cards plus '+(n<=5?2:n===6?3:4)+' jokers.</div>'+
-    (host?'<button class="act" onclick="act(\'start\')"'+(n<2?' disabled':'')+'>Start game</button>':'<div class="rule">Waiting for the host to start…</div>')+
-    '<div class="err">'+esc(err)+'</div>';
+  return langBtn()+'<h2>'+t('l_title')+'</h2><div class="code">'+esc(S.code)+'</div>'+
+    '<div class="rule">'+t('l_give')+'</div>'+
+    '<button class="act alt" onclick="copyLink()">'+t('l_share')+'</button>'+
+    S.players.map(function(x,i){return '<div class="row"><b>'+bdi(x.name)+'</b> <small>'+(i===0?t('l_host'):'')+(i===S.you?t('l_you'):'')+(x.on?t('l_on'):t('l_off'))+'</small></div>'}).join('')+
+    '<div class="rule">'+t('l_count',{n:n})+'</div>'+
+    '<div class="rule">'+t('l_deck',{n:n,d:n>4?104:52,j:n<=5?2:n===6?3:4})+'</div>'+
+    (host?'<button class="act" onclick="act(\'start\')"'+(n<2?' disabled':'')+'>'+t('l_start')+'</button>':'<div class="rule">'+t('l_wait')+'</div>')+
+    '<div class="err">'+(err?errText(err):'')+'</div>';
 }
 function promptHtml(){
   var b=best(S.hand),k=S.call.kind==='double';
-  return '<h2>'+(k?esc(S.players[S.declarer].name)+' declared':esc(S.players[S.parts[1]].name)+' called Double')+'</h2>'+
-    '<div>Your best suit: <b>'+b.s+' '+b.t+'</b></div>'+
-    '<div class="rule">'+(k?'Call Double if you think you have more than the declarer. The winner scores double.':'Call Triple if you think you have more than both. The winner scores triple.')+' Unanswered calls pass after 25 seconds.</div>'+
-    '<div class="bar"><button class="act" onclick="act(\'call\',{yes:true})">'+(k?'Double':'Triple')+'</button>'+
-    '<button class="act alt" onclick="act(\'call\',{yes:false})">Pass</button></div>';
+  return '<h2>'+(k?t('p_decl',{n:bdi(S.players[S.declarer].name)}):t('p_dbl',{n:bdi(S.players[S.parts[1]].name)}))+'</h2>'+
+    '<div>'+t('p_best',{s:b.s,t:'<b>'+b.t+'</b>'})+'</div>'+
+    '<div class="rule">'+(k?t('p_dblHelp'):t('p_trpHelp'))+t('p_auto')+'</div>'+
+    '<div class="bar"><button class="act" onclick="act(\'call\',{yes:true})">'+(k?t('p_double'):t('p_triple'))+'</button>'+
+    '<button class="act alt" onclick="act(\'call\',{yes:false})">'+t('p_pass')+'</button></div>';
 }
 function revealHtml(){
-  var r=S.res,roles=['Declared','Doubled','Tripled'];
+  var r=S.res,roles=[t('r_decl'),t('r_dbl'),t('r_trp')];
   var rows=S.players.map(function(x,p){
     var ix=r.parts.indexOf(p),bt=best(x.hand||[]);
-    return '<div class="row'+(p===r.w?' win':'')+'"><b>'+esc(x.name)+'</b> <small>'+(r.de?'Showdown':ix>=0?roles[ix]:'Sat out')+' · '+bt.s+' '+bt.t+'</small><div class="fan">'+
+    return '<div class="row'+(p===r.w?' win':'')+'"><b>'+bdi(x.name)+'</b> <small>'+(r.de?t('r_show'):ix>=0?roles[ix]:t('r_sat'))+' · '+bt.s+' '+bt.t+'</small><div class="fan">'+
       (x.hand||[]).map(function(c){return face(c,'sm'+((c.j||c.s===bt.s)?' use':''))}).join('')+'</div></div>';
   }).join('');
-  var wn=esc(S.players[r.w].name);
-  var line=r.pts?wn+' wins '+r.t+' × '+r.mult+' = '+r.pts+' points':'No points: the best total is under 40';
-  return '<h2>'+line+'</h2>'+(r.de?'<div class="rule">The deck ran out, so the round ended.</div>':'')+rows+
-    '<button class="act" onclick="act(\'next\')">'+(S.round>=S.rounds?'See final result':'Next round')+'</button>'+'<div class="err">'+esc(err)+'</div>';
+  var line=r.pts?t('r_win',{n:bdi(S.players[r.w].name),t:r.t,m:r.mult,p:r.pts}):t('r_none');
+  return '<h2>'+line+'</h2>'+(r.de?'<div class="rule">'+t('r_de')+'</div>':'')+rows+
+    '<button class="act" onclick="act(\'next\')">'+(S.round>=S.rounds?t('r_final'):t('r_next'))+'</button>'+'<div class="err">'+(err?errText(err):'')+'</div>';
 }
 function finalHtml(){
   var P=S.players.map(function(x,i){return {n:x.name,s:x.score,i:i}}),mx=Math.max.apply(null,P.map(function(x){return x.s}));
   var w=P.filter(function(x){return x.s===mx});
-  var t=w.length>1?'Tie: '+w.map(function(x){return esc(x.n)}).join(' and '):esc(w[0].n)+' wins the game!';
-  return '<h2>'+t+'</h2>'+P.slice().sort(function(a,b){return b.s-a.s}).map(function(x){return '<div class="row'+(x.s===mx?' win':'')+'"><b>'+esc(x.n)+'</b>: '+x.s+' points</div>'}).join('')+
-    (S.you===0?'<button class="act" onclick="act(\'again\')">Play again</button>':'<div class="rule">The host can start a new game.</div>');
+  var ti=w.length>1?t('f_tie',{n:w.map(function(x){return bdi(x.n)}).join(t('f_and'))}):t('f_win',{n:bdi(w[0].n)});
+  return langBtn()+'<h2>'+ti+'</h2>'+P.slice().sort(function(a,b){return b.s-a.s}).map(function(x){return '<div class="row'+(x.s===mx?' win':'')+'">'+t('f_pts',{n:'<b>'+bdi(x.n)+'</b>',s:x.s})+'</div>'}).join('')+
+    (S.you===0?'<button class="act" onclick="act(\'again\')">'+t('f_again')+'</button>':'<div class="rule">'+t('f_wait')+'</div>');
 }
 function render(){
   var ov=$('ov');
-  if(!S){ov.hidden=false;ov.innerHTML=PID?'<h2>Connecting…</h2><div class="rule">If the server was asleep this can take up to a minute.</div><button class="act alt" onclick="toHome()">Back</button>':homeHtml();return}
+  if(!S){ov.hidden=false;ov.innerHTML=PID?'<h2>'+t('c_title')+'</h2><div class="rule">'+t('c_sub')+'</div><button class="act alt" onclick="toHome()">'+t('c_back')+'</button>':homeHtml();return}
   if(S.phase==='lobby'){ov.hidden=false;ov.innerHTML=lobbyHtml();return}
   var me=S.you,P=S.players,tm=S.phase==='turn'&&S.turn===me,mine=tm&&S.step==='act',disc=tm&&S.step==='throw',need=S.pend,k=S.table.length,pk=mode==='pickone';
-  $('rnd').textContent='Round '+Math.min(S.round,S.rounds)+' of '+S.rounds;
+  $('rnd').textContent=t('round',{a:Math.min(S.round,S.rounds),b:S.rounds});
   $('scores').innerHTML=P.map(function(x,p){
-    return '<div class="sc'+(S.phase==='turn'&&S.turn===p?' turn':'')+'">'+esc(x.name)+(p===me?' (you)':'')+'<b>'+x.score+'</b></div>';
+    return '<div class="sc'+(S.phase==='turn'&&S.turn===p?' turn':'')+'">'+bdi(x.name)+(p===me?' '+t('you'):'')+'<b>'+x.score+'</b></div>';
   }).join('');
   $('cpus').innerHTML=P.map(function(x,p){
-    return p===me?'':'<div class="chip'+(S.phase==='turn'&&S.turn===p?' turn':'')+'">'+esc(x.name)+' · '+x.count+' cards'+(x.on?'':' · offline')+'</div>';
+    return p===me?'':'<div class="chip'+(S.phase==='turn'&&S.turn===p?' turn':'')+'">'+t('chip',{n:bdi(x.name),c:cp(x.count)})+(x.on?'':t('off'))+'</div>';
   }).join('');
-  $('deckN').textContent=S.deck+' in deck';
-  $('top').innerHTML=k?S.table.map(function(c,i){return face(c,'sm'+(pk?' pick':''),pk&&mine?'onclick="act(\'takeOne\',{i:'+i+'})"':'')}).join(''):'<span class="rule">Nothing on the table</span>';
-  $('tblN').textContent='On the table: '+k;
-  var m=err||(pk?'Tap the table card you want.':S.msg);
+  $('deckN').textContent=t('deckN',{n:S.deck});
+  $('top').innerHTML=k?S.table.map(function(c,i){return face(c,'sm'+(pk?' pick':''),pk&&mine?'onclick="act(\'takeOne\',{i:'+i+'})"':'')}).join(''):'<span class="rule">'+t('tableEmpty')+'</span>';
+  $('tblN').textContent=t('tableN',{n:k});
+  var m=err?errText(err):(pk?t('hintPick'):fmtMsg(S.msg));
   if(!err&&!pk){
-    if(mine)m+=' Your turn: draw, take from the table, or declare.';
-    else if(disc)m+=' Throw '+need+' card'+(need>1?'s':'')+(need>1?': tap them, then press Throw.':'.');
-    else if(S.phase==='call'&&S.call&&!S.call.mine)m+=' Waiting for the other players…';
+    if(mine)m+=' '+t('hintMine');
+    else if(disc)m+=' '+(need>1?t('hintThrowN',{c:cp(need)}):t('hintThrow1'));
+    else if(S.phase==='call'&&S.call&&!S.call.mine)m+=' '+t('hintWait');
   }
   $('msg').textContent=m;
   var h=S.hand,b=best(h);
-  $('tot').textContent='Your best suit: '+b.s+' '+b.t+(b.t>=40?' (enough to score)':' (need 40)');
-  $('hand').className=h.length>6?'many':'';$('hand').innerHTML=h.map(function(c,i){
+  $('tot').textContent=t('best',{s:b.s,t:b.t})+t(b.t>=40?'bestOk':'bestNeed');
+  $('hand').className=h.length>6?'many':'';
+  $('hand').innerHTML=h.map(function(c,i){
     var cls=(disc&&need>1)?(sel.indexOf(i)>=0?'sel':''):((c.j||c.s===b.s)?'use':'');
     return face(c,cls+(h.length>6?' sm':''),disc?'onclick="hDiscard('+i+')"':'');
   }).join('');
   var bar='';
   if(mine){
-    if(S.deck)bar+='<button class="act" onclick="act(\'draw\')">Draw from deck'+(k>=5?' (wipes table)':'')+'</button>';
-    if(k>0&&k<5)bar+='<button class="act alt" onclick="act(\'takeAll\')">Take the '+(k===1?'card':k+' cards')+'</button>';
-    if(k>=5)bar+='<button class="act alt" onclick="act(\'takeAll\')">Take all '+k+'</button><button class="act alt" onclick="mode=\'pickone\';render()">Take one</button>';
-    bar+='<button class="act alt" onclick="act(\'declare\')"'+(b.t<40||h.length!==5?' disabled':'')+'>Declare</button>';
+    if(S.deck)bar+='<button class="act" onclick="act(\'draw\')">'+t('draw')+(k>=5?t('wipes'):'')+'</button>';
+    if(k>0&&k<5)bar+='<button class="act alt" onclick="act(\'takeAll\')">'+(k===1?t('takeCard'):t('takeCards',{c:cp(k)}))+'</button>';
+    if(k>=5)bar+='<button class="act alt" onclick="act(\'takeAll\')">'+t('takeAll',{k:k})+'</button><button class="act alt" onclick="mode=\'pickone\';render()">'+t('takeOne')+'</button>';
+    bar+='<button class="act alt" onclick="act(\'declare\')"'+(b.t<40||h.length!==5?' disabled':'')+'>'+t('declare')+'</button>';
   }else if(disc&&need>1){
-    bar='<button class="act" onclick="hThrow()"'+(sel.length===need?'':' disabled')+'>Throw '+sel.length+' of '+need+'</button>';
+    bar='<button class="act" onclick="hThrow()"'+(sel.length===need?'':' disabled')+'>'+t('throwBtn',{a:sel.length,b:need})+'</button>';
   }
   $('bar').innerHTML=bar;$('ptr').hidden=!mine;
   if(S.phase==='call'&&S.call&&S.call.mine){ov.hidden=false;ov.innerHTML=promptHtml()}
@@ -243,17 +310,17 @@ function render(){
   else ov.hidden=true;
 }
 function hDiscard(i){
-  if(need1()){act('throw',{idx:[i]});return}
+  if(S.pend===1){act('throw',{idx:[i]});return}
   var j=sel.indexOf(i);if(j>=0)sel.splice(j,1);else if(sel.length<S.pend)sel.push(i);render();
 }
-function need1(){return S.pend===1}
 function hThrow(){if(sel.length===S.pend)act('throw',{idx:sel.slice()})}
 (function(){
+  try{var l=localStorage.getItem('declare_lang');LANG=l||((navigator.language||'').slice(0,2)==='ar'?'ar':'en')}catch(e){}
   var q=new URLSearchParams(location.search).get('code');if(q)PRE=q.toUpperCase().slice(0,4);
   try{var o=JSON.parse(localStorage.getItem('declare'));if(o){NAME=o.name||'';if(o.code&&o.pid){SAVED={code:o.code,pid:o.pid,name:NAME};if(!PRE)PRE=o.code}}}catch(e){}
   document.addEventListener('visibilitychange',function(){if(document.hidden)HID=Date.now();else if(S&&HID&&Date.now()-HID>5000){HID=0;err='';toHome()}});
   window.addEventListener('pageshow',function(e){if(e.persisted&&S)toHome()});
-  render();
+  applyLang();render();
 })();
 </script>
 </body>

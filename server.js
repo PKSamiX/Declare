@@ -40,7 +40,7 @@ function pickBest(pool) {
 function newRoom() {
   let code;
   do { code = Array.from({ length: 4 }, () => 'ABCDEFGHJKMNPQRSTUVWXYZ'[crypto.randomInt(23)]).join(''); } while (rooms.has(code));
-  const room = { code, players: [], phase: 'lobby', round: 0, deck: [], table: [], turn: 0, step: 'act', pend: 1, msg: '',
+  const room = { code, players: [], phase: 'lobby', round: 0, deck: [], table: [], turn: 0, step: 'act', pend: 1, msg: [],
     declarer: -1, mult: 1, parts: [], call: null, res: null, upd: Date.now(), tt: null };
   rooms.set(code, room); return room;
 }
@@ -65,12 +65,12 @@ function newRound(room) {
   room.deck = dk; room.players.forEach((p, i) => { p.hand = hs[i]; });
   room.table = []; room.turn = st; room.step = 'throw'; room.pend = 1;
   room.phase = 'turn'; room.declarer = -1; room.mult = 1; room.parts = []; room.call = null; room.res = null;
-  room.msg = 'Round ' + room.round + ': ' + room.players[st].name + ' starts and throws a card.';
+  room.msg = [{ k: 'start', r: room.round, n: room.players[st].name }];
 }
 function endTurn(room) {
   if (!room.deck.length) return resolve(room, true); // deck ran out: round ends
   room.turn = (room.turn + 1) % room.players.length; room.step = 'act'; room.pend = 1;
-  room.msg += ' ' + room.players[room.turn].name + ' to play.';
+  room.msg.push({ k: 'toPlay', n: room.players[room.turn].name });
 }
 function resolve(room, deckEnd) {
   const parts = deckEnd ? room.players.map((p, i) => i) : room.parts, mult = deckEnd ? 1 : room.mult;
@@ -87,66 +87,66 @@ function act(room, p, a) {
   const pi = room.players.indexOf(p), mine = room.phase === 'turn' && room.turn === pi;
   switch (a.type) {
     case 'start':
-      if (room.phase !== 'lobby' || pi !== 0) return 'Only the host can start the game.';
-      if (room.players.length < 2) return 'You need at least 2 players.';
+      if (room.phase !== 'lobby' || pi !== 0) return 'host_only';
+      if (room.players.length < 2) return 'need2';
       room.players.forEach(x => { x.score = 0; }); room.round = 0; newRound(room); return;
     case 'draw': {
-      if (!mine || room.step !== 'act' || !room.deck.length) return 'You cannot draw now.';
+      if (!mine || room.step !== 'act' || !room.deck.length) return 'no_draw';
       const wipe = room.table.length >= 5; if (wipe) room.table = [];
       p.hand.push(room.deck.pop()); room.step = 'throw'; room.pend = 1;
-      room.msg = p.name + ' drew a card' + (wipe ? ' and wiped the table' : '') + '.'; return;
+      room.msg = [{ k: wipe ? 'drewW' : 'drew', n: p.name }]; return;
     }
     case 'takeAll': {
       const k = room.table.length;
-      if (!mine || room.step !== 'act' || !k) return 'You cannot take now.';
+      if (!mine || room.step !== 'act' || !k) return 'no_take';
       p.hand = p.hand.concat(room.table); room.table = []; room.step = 'throw'; room.pend = k;
-      room.msg = p.name + ' took ' + k + ' card' + (k > 1 ? 's' : '') + ' from the table.'; return;
+      room.msg = [{ k: 'tookAll', n: p.name, c: k }]; return;
     }
     case 'takeOne': {
       const i = a.i;
-      if (!mine || room.step !== 'act' || room.table.length < 5 || !Number.isInteger(i) || i < 0 || i >= room.table.length) return 'You cannot take one now.';
+      if (!mine || room.step !== 'act' || room.table.length < 5 || !Number.isInteger(i) || i < 0 || i >= room.table.length) return 'no_take_one';
       p.hand.push(room.table.splice(i, 1)[0]); room.step = 'throw'; room.pend = 1;
-      room.msg = p.name + ' took one card from the table.'; return;
+      room.msg = [{ k: 'tookOne', n: p.name }]; return;
     }
     case 'throw': {
       const idx = a.idx;
-      if (!mine || room.step !== 'throw' || !Array.isArray(idx) || idx.length !== room.pend) return 'Throw the right number of cards.';
+      if (!mine || room.step !== 'throw' || !Array.isArray(idx) || idx.length !== room.pend) return 'bad_count';
       const set = new Set(idx);
-      if (set.size !== idx.length || idx.some(i => !Number.isInteger(i) || i < 0 || i >= p.hand.length)) return 'Invalid cards.';
+      if (set.size !== idx.length || idx.some(i => !Number.isInteger(i) || i < 0 || i >= p.hand.length)) return 'bad_cards';
       const out = []; p.hand = p.hand.filter((c, i) => { if (set.has(i)) { out.push(c); return false; } return true; });
       room.table = room.table.concat(out);
-      room.msg = p.name + ' threw ' + out.length + ' card' + (out.length > 1 ? 's' : '') + '.';
+      room.msg = [{ k: 'threw', n: p.name, c: out.length }];
       endTurn(room); return;
     }
     case 'declare':
-      if (!mine || room.step !== 'act' || p.hand.length !== 5 || best(p.hand).t < 40) return 'You need 40 points to declare.';
+      if (!mine || room.step !== 'act' || p.hand.length !== 5 || best(p.hand).t < 40) return 'need40';
       room.declarer = pi; room.parts = [pi]; room.mult = 1; room.phase = 'call';
       room.call = { kind: 'double', pending: room.players.map((x, i) => i).filter(i => i !== pi) };
-      room.msg = p.name + ' declared!'; return;
+      room.msg = [{ k: 'declared', n: p.name }]; return;
     case 'call': {
       const c = room.call;
-      if (room.phase !== 'call' || !c || !c.pending.includes(pi)) return 'Nothing to answer.';
+      if (room.phase !== 'call' || !c || !c.pending.includes(pi)) return 'no_call';
       c.pending = c.pending.filter(i => i !== pi);
       if (a.yes) {
         room.parts.push(pi);
         if (c.kind === 'double') {
-          room.mult = 2; room.msg = p.name + ' called Double!';
+          room.mult = 2; room.msg = [{ k: 'dbl', n: p.name }];
           const rest = room.players.map((x, i) => i).filter(i => i !== room.declarer && i !== pi);
           if (rest.length) room.call = { kind: 'triple', pending: rest }; else resolve(room);
-        } else { room.mult = 3; room.msg = p.name + ' called Triple!'; resolve(room); }
+        } else { room.mult = 3; room.msg = [{ k: 'trp', n: p.name }]; resolve(room); }
       } else if (!c.pending.length) resolve(room);
       return;
     }
     case 'next':
-      if (room.phase !== 'reveal') return 'Not now.';
+      if (room.phase !== 'reveal') return 'not_now';
       if (room.round >= ROUNDS) room.phase = 'final'; else newRound(room);
       return;
     case 'again':
-      if (room.phase !== 'final' || pi !== 0) return 'Only the host can restart.';
-      room.phase = 'lobby'; room.round = 0; room.res = null; room.msg = '';
+      if (room.phase !== 'final' || pi !== 0) return 'host_only';
+      room.phase = 'lobby'; room.round = 0; room.res = null; room.msg = [];
       room.players.forEach(x => { x.hand = []; x.score = 0; }); return;
   }
-  return 'Unknown action.';
+  return 'unknown';
 }
 
 // A player who is away for 2 minutes gets a simple automatic move so nobody is stuck
@@ -160,7 +160,7 @@ function autoMove(room) {
   }
   if (room.phase === 'turn' && room.step === 'throw') {
     const idx = pickBest(p.hand).toss.map(c => p.hand.indexOf(c));
-    act(room, p, { type: 'throw', idx }); room.msg = '(auto) ' + room.msg;
+    act(room, p, { type: 'throw', idx }); room.msg.unshift({ k: 'auto' });
   }
 }
 function arm(room) {
@@ -207,11 +207,11 @@ const server = http.createServer((req, res) => {
   if (req.method === 'POST' && u.pathname.startsWith('/api/')) {
     return readBody(req, b => {
       if (u.pathname === '/api/create') {
-        if (rooms.size >= 300) return json(res, 503, { error: 'The server is full. Try again later.' });
+        if (rooms.size >= 300) return json(res, 503, { error: 'full_server' });
         const room = newRoom(), p = addPlayer(room, b.name); return json(res, 200, { code: room.code, pid: p.id });
       }
       const room = rooms.get(String(b.code || '').toUpperCase());
-      if (!room) return json(res, 404, { error: 'Game not found. Check the code.' });
+      if (!room) return json(res, 404, { error: 'no_game' });
       if (u.pathname === '/api/join') {
         // someone coming back with the same name takes their old seat (during a game, or in the lobby if that seat is offline)
         const nm = cleanName(b.name).toLowerCase(), old = room.players.find(x => x.name.toLowerCase() === nm);
@@ -220,17 +220,17 @@ const server = http.createServer((req, res) => {
           if (old.res) { const r0 = old.res; old.res = null; try { r0.end(); } catch (e) { /* ignore */ } }
           push(room); return json(res, 200, { code: room.code, pid: old.id, back: true });
         }
-        if (room.phase !== 'lobby') return json(res, 400, { error: 'That game has already started. To get back in, join with the exact name you used before.' });
-        if (room.players.length >= MAXP) return json(res, 400, { error: 'That game is full (10 players).' });
+        if (room.phase !== 'lobby') return json(res, 400, { error: 'started' });
+        if (room.players.length >= MAXP) return json(res, 400, { error: 'full' });
         const p = addPlayer(room, b.name); push(room); return json(res, 200, { code: room.code, pid: p.id });
       }
       if (u.pathname === '/api/act') {
         const p = room.players.find(x => x.id === b.pid);
-        if (!p) return json(res, 403, { error: 'You are not in this game.' });
+        if (!p) return json(res, 403, { error: 'not_in' });
         const err = act(room, p, b); if (err) return json(res, 400, { error: err });
         broadcast(room); return json(res, 200, { ok: true });
       }
-      json(res, 404, { error: 'Not found' });
+      json(res, 404, { error: 'unknown' });
     });
   }
   if (u.pathname === '/') {
