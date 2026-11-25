@@ -44,8 +44,9 @@ function newRoom() {
     declarer: -1, mult: 1, parts: [], call: null, res: null, upd: Date.now(), tt: null };
   rooms.set(code, room); return room;
 }
+function cleanName(n) { return String(n || '').replace(/[<>&"'`]/g, '').trim().slice(0, 14) || 'Player'; }
 function addPlayer(room, name) {
-  name = String(name || '').replace(/[<>&"'`]/g, '').trim().slice(0, 14) || 'Player';
+  name = cleanName(name);
   let n = name, k = 2; while (room.players.some(p => p.name === n)) n = name + ' ' + k++;
   const p = { id: crypto.randomBytes(12).toString('hex'), name: n, hand: [], score: 0, res: null };
   room.players.push(p); return p;
@@ -212,7 +213,14 @@ const server = http.createServer((req, res) => {
       const room = rooms.get(String(b.code || '').toUpperCase());
       if (!room) return json(res, 404, { error: 'Game not found. Check the code.' });
       if (u.pathname === '/api/join') {
-        if (room.phase !== 'lobby') return json(res, 400, { error: 'That game has already started.' });
+        // someone coming back with the same name takes their old seat (during a game, or in the lobby if that seat is offline)
+        const nm = cleanName(b.name).toLowerCase(), old = room.players.find(x => x.name.toLowerCase() === nm);
+        if (old && (room.phase !== 'lobby' || !old.res)) {
+          old.id = crypto.randomBytes(12).toString('hex'); // the old device's token stops working
+          if (old.res) { const r0 = old.res; old.res = null; try { r0.end(); } catch (e) { /* ignore */ } }
+          push(room); return json(res, 200, { code: room.code, pid: old.id, back: true });
+        }
+        if (room.phase !== 'lobby') return json(res, 400, { error: 'That game has already started. To get back in, join with the exact name you used before.' });
         if (room.players.length >= MAXP) return json(res, 400, { error: 'That game is full (10 players).' });
         const p = addPlayer(room, b.name); push(room); return json(res, 200, { code: room.code, pid: p.id });
       }

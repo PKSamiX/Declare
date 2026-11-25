@@ -91,7 +91,7 @@ input{font:inherit;padding:12px 14px;border-radius:12px;border:0;width:100%;max-
 </div>
 <script>
 var SUITS=['♠','♥','♦','♣'];
-var S=null,PREV=null,CODE='',PID='',NAME='',PRE='',ES=null,sel=[],mode='',err='',MUTE=false,AC=null;
+var S=null,PREV=null,CODE='',PID='',NAME='',PRE='',ES=null,sel=[],mode='',err='',MUTE=false,AC=null,SAVED=null,CT=0,HID=0;
 function $(id){return document.getElementById(id)}
 function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function red(s){return s==='♥'||s==='♦'}
@@ -118,14 +118,17 @@ function snd(k){
 function face(c,cls,att){
   return '<button class="card '+(c.j?'jk ':red(c.s)?'red ':'')+(cls||'')+'" '+(att||'disabled tabindex="-1"')+' aria-label="'+nm(c)+'"><span>'+c.r+'</span><i>'+c.s+'</i></button>';
 }
-function save(){try{localStorage.setItem('declare',JSON.stringify({code:CODE,pid:PID,name:NAME}))}catch(e){}}
-function forget(){try{localStorage.removeItem('declare')}catch(e){}CODE='';PID='';S=null;PREV=null;if(ES)ES.close();render()}
+function save(){SAVED={code:CODE,pid:PID,name:NAME};try{localStorage.setItem('declare',JSON.stringify(SAVED))}catch(e){}}
+function toHome(){clearTimeout(CT);if(ES)ES.close();ES=null;S=null;PREV=null;CODE='';PID='';if(!PRE&&SAVED)PRE=SAVED.code;render()}
+function forget(){try{localStorage.removeItem('declare')}catch(e){}SAVED=null;toHome()}
+function rejoin(){if(!SAVED)return;CODE=SAVED.code;PID=SAVED.pid;err='';snd('init');connect();render()}
 function post(path,body){
   return fetch('/api/'+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
     .then(function(r){return r.json()}).catch(function(){return {error:'Cannot reach the server. It may be waking up: wait a minute and try again.'}});
 }
 function connect(){
   if(ES)ES.close();
+  clearTimeout(CT);CT=setTimeout(function(){if(!S){err='Could not connect. Try again, or join with the code and the exact same name.';toHome()}},12000);
   ES=new EventSource('/api/events?code='+encodeURIComponent(CODE)+'&pid='+encodeURIComponent(PID));
   ES.onmessage=function(e){onState(JSON.parse(e.data))};
   ES.onerror=function(){if(ES.readyState===2){err='That game is no longer available.';forget()}};
@@ -152,7 +155,7 @@ function copyLink(){
   if(navigator.clipboard){navigator.clipboard.writeText(url).then(function(){err='Link copied.';render();setTimeout(function(){err='';render()},1800)},function(){})}
 }
 function homeHtml(){
-  return '<h2>Declare</h2><div class="rule">Play online with friends and family. Only people who join take part, and no computer players are added.</div>'+
+  return '<h2>Declare</h2><div class="rule">Play online with friends and family. Only people who join take part, and no computer players are added.</div>'+(SAVED?'<button class="act" onclick="rejoin()">Rejoin game '+esc(SAVED.code)+'</button><div class="rule">or start fresh</div>':'')+
     '<input id="nm" placeholder="Your name" maxlength="14" autocomplete="off" value="'+esc(NAME)+'">'+
     '<button class="act" onclick="create()">Create a game</button>'+
     '<div class="rule">or join a friend’s game with its code</div>'+
@@ -198,7 +201,7 @@ function finalHtml(){
 }
 function render(){
   var ov=$('ov');
-  if(!S){ov.hidden=false;ov.innerHTML=PID?'<h2>Connecting…</h2><div class="rule">If the server was asleep this can take up to a minute.</div>':homeHtml();return}
+  if(!S){ov.hidden=false;ov.innerHTML=PID?'<h2>Connecting…</h2><div class="rule">If the server was asleep this can take up to a minute.</div><button class="act alt" onclick="toHome()">Back</button>':homeHtml();return}
   if(S.phase==='lobby'){ov.hidden=false;ov.innerHTML=lobbyHtml();return}
   var me=S.you,P=S.players,tm=S.phase==='turn'&&S.turn===me,mine=tm&&S.step==='act',disc=tm&&S.step==='throw',need=S.pend,k=S.table.length,pk=mode==='pickone';
   $('rnd').textContent='Round '+Math.min(S.round,S.rounds)+' of '+S.rounds;
@@ -247,7 +250,9 @@ function need1(){return S.pend===1}
 function hThrow(){if(sel.length===S.pend)act('throw',{idx:sel.slice()})}
 (function(){
   var q=new URLSearchParams(location.search).get('code');if(q)PRE=q.toUpperCase().slice(0,4);
-  try{var o=JSON.parse(localStorage.getItem('declare'));if(o){NAME=o.name||'';if(o.code&&o.pid&&(!q||q.toUpperCase()===o.code)){CODE=o.code;PID=o.pid;connect()}}}catch(e){}
+  try{var o=JSON.parse(localStorage.getItem('declare'));if(o){NAME=o.name||'';if(o.code&&o.pid){SAVED={code:o.code,pid:o.pid,name:NAME};if(!PRE)PRE=o.code}}}catch(e){}
+  document.addEventListener('visibilitychange',function(){if(document.hidden)HID=Date.now();else if(S&&HID&&Date.now()-HID>5000){HID=0;err='';toHome()}});
+  window.addEventListener('pageshow',function(e){if(e.persisted&&S)toHome()});
   render();
 })();
 </script>

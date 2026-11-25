@@ -40,7 +40,7 @@ Render's free plan puts a web service to sleep after 15 minutes with no requests
 - The deck depends on the number of players. 2 to 4 players: 52 cards plus 2 jokers. 5 players: two decks (104 cards) plus 2 jokers. 6 players: 104 cards plus 3 jokers. 7 to 10 players: 104 cards plus 4 jokers.
 - If a player does nothing for 2 minutes, the game makes a simple move for them so nobody is stuck.
 - Unanswered Double or Triple calls pass automatically after 25 seconds.
-- A player who closes the page can come back on the same phone and rejoin the same game.
+- A player who leaves the page for more than a few seconds, or refreshes it, lands on the start screen. They tap Rejoin, or join again with the same code and the exact same name, and they get their old seat and hand back. They can also create a new game instead.
 - Finished or abandoned games are deleted after 6 hours without activity.
 
 ## Making it an Android app later
